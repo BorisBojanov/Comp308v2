@@ -23,11 +23,10 @@ import java.awt.*;
 public class GreenhouseGUI extends JFrame implements EventListener {
     private GreenhouseControls greenhouse;
     private JTextArea eventLog;
-    private JTextField filePathField;
+    private JTextField filePath;
     private DropdownMenu dropdownMenu;
     // JTextArea eventLog;
     JPanel filePanel;
-    JButton loadButton;
     JPanel buttonPanel;
     JButton startButton;
     JButton suspendButton;
@@ -51,7 +50,6 @@ public class GreenhouseGUI extends JFrame implements EventListener {
 
         add(new JScrollPane(eventLog), BorderLayout.CENTER);
         //-------------------------
-
 
         // Control Buttons on bottom of window
         buttonPanel = new JPanel();
@@ -87,10 +85,10 @@ public class GreenhouseGUI extends JFrame implements EventListener {
             resumeButton.setEnabled(false);
         });
 
-        loadButton.addActionListener(e -> greenhouse.loadEventsFromFile(filePathField.getText()));
+        startButton.addActionListener(e -> greenhouse.loadEventsFromFile(getFilePathText()));
         
         restartButton.addActionListener(e -> {
-            if (filePathField.getText().trim().isEmpty()) {
+            if (filePath.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No event file loaded.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -100,8 +98,8 @@ public class GreenhouseGUI extends JFrame implements EventListener {
                 return;
             }
     
-            greenhouse.loadEventsFromFile(filePathField.getText());
-            System.out.println(" Restarting event file: " + filePathField.getText());
+            greenhouse.loadEventsFromFile(filePath.getText());
+            System.out.println(" Restarting event file: " + filePath.getText());
     
             startButton.setEnabled(true);
             popupMenu.updateMenuState(false);
@@ -130,6 +128,9 @@ public class GreenhouseGUI extends JFrame implements EventListener {
             }
         });
 
+
+        // Register this GUI as the event listener
+        Event.setEventListener(this); 
     } // End of Constructor
 
     @Override
@@ -141,11 +142,12 @@ public class GreenhouseGUI extends JFrame implements EventListener {
         });
     }
 
+
     public String getFilePathText() {
-        String filePath = filePathField.getText();
-        return filePath;
+        String filePathText = filePath.getText();
+        return filePathText;
     }
-    
+
     private void setupUI() {
         // Set up GUI properties
         this.setTitle("Greenhouse Controls");
@@ -159,36 +161,12 @@ public class GreenhouseGUI extends JFrame implements EventListener {
         // File Input Section
         filePanel = new JPanel();
         filePanel.setLayout(new BorderLayout());
-
-        
-        filePathField = new JTextField("Enter file path here...");
-        loadButton = new JButton("Load Events");
-
-        filePanel.add(filePathField, BorderLayout.CENTER);
-        filePanel.add(loadButton, BorderLayout.EAST);
-        add(filePanel, BorderLayout.NORTH);
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             GreenhouseGUI gui = new GreenhouseGUI();
             gui.setVisible(true);
-
-            // GreenhouseControls greenhouse = new GreenhouseControls();
-            // // Start different events dynamically
-            // greenhouse.startEvent("LightOn",2000,0);
-            // greenhouse.startEvent("LightOff",4000,0);
-            // greenhouse.startEvent("FixWindow",6000,0);
-    
-            // // Suspend and resume events after some time
-            // try {
-            //     Thread.sleep(5000);
-            //     greenhouse.suspendEvents();
-            //     Thread.sleep(2000);
-            //     greenhouse.resumeEvents();
-            // } catch (InterruptedException e) {
-            //     e.printStackTrace();
-            // }
 
         });
     }

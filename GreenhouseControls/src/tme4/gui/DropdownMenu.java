@@ -108,7 +108,9 @@ public class DropdownMenu extends JMenuBar {
         if (returnValue == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
             greenhouse.loadEventsFromFile(selectedFile.getAbsolutePath());
-            System.out.println("✅ Loaded events from file: " + selectedFile.getAbsolutePath());
+            //C:\Users\boris\Desktop\Comp308v2\Comp308v2\GreenhouseControls\examples2.txt
+            System.out.println("Loaded events from file: " + selectedFile.getAbsolutePath());
+            greenhouse.printStateVariables(); // See format of Map values stored. 
         } else {
             JOptionPane.showMessageDialog(parentFrame, "No file selected", "Error", JOptionPane.ERROR_MESSAGE);
         }

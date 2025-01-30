@@ -5,4 +5,4 @@ Event=ThermostatDay,time=10000
 Event=Bell,time=2000,rings=2
 Event=WaterOn,time=6000
 Event=LightOff,time=4000
-Event=Terminate,time=12000
+Event=Terminatte,time=12000

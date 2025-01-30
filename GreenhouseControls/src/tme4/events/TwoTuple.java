@@ -8,6 +8,13 @@ public class TwoTuple<A, B> {
         this.key = key;
         this.value = value;
     }
+    public B get(Object var1){
+        return value;
+    }
+    //V put(K var1, V var2);
+    public B put(A var1, B var2){
+        return value;
+    }
 
     @Override
     public String toString() {
