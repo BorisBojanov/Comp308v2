@@ -1,6 +1,6 @@
 package tme4;
 
-import javax.swing.SwingUtilities;
+// import javax.swing.SwingUtilities;
 
 public abstract class Event implements Runnable {
 
@@ -10,6 +10,8 @@ public abstract class Event implements Runnable {
     private volatile boolean running = true;
     private final Object lock = new Object();
 
+    private static EventListener eventListener;
+
     // Constructor
     public Event(GreenhouseControls greenhouse, long delayTime) {
         this.greenhouse = greenhouse;
@@ -18,14 +20,14 @@ public abstract class Event implements Runnable {
         // start();  
     }
 
-    //Define a callback mechanism so that each event can send messages to a GUI panel
-    // Add a listener for GUI output
-    private static EventListener eventListener;
+    // //Define a callback mechanism so that each event can send messages to a GUI panel
+    // // Add a listener for GUI output
+    // private static EventListener eventListener;
 
-    // Interface for event updates (GUI will implement this)
-    public interface EventListener {
-        void onEventTriggered(String eventDescription);
-    }
+    // // Interface for event updates (GUI will implement this)
+    // public interface EventListener {
+    //     void onEventTriggered(String eventDescription);
+    // }
 
     public static void setEventListener(EventListener listener) {
         System.out.println("✅ Event listener set: " + listener);
@@ -33,9 +35,9 @@ public abstract class Event implements Runnable {
     }
 
 
-    protected void setVariable(String key, Object value) {
-        GreenhouseControls.setVariable(key, value);
-    }
+    // protected void setVariable(String key, Object value) {
+    //     GreenhouseControls.setVariable(key, value);
+    // }
 
     public void start() {
         eventTime = System.currentTimeMillis() + delayTime;
@@ -49,49 +51,36 @@ public abstract class Event implements Runnable {
     @Override
     public void run() {
         try {
-            long waitTime = eventTime - System.currentTimeMillis();
-            System.out.println("⏳ Waiting " + waitTime + "ms for event: " + this);
-    
-            if (waitTime > 0) {
-                Thread.sleep(waitTime);
-            }
-    
+            Thread.sleep(delayTime);
             synchronized (lock) {
                 while (!running) {
-                    System.out.println("⏸️ Event suspended: " + this);
                     lock.wait();
                 }
             }
-    
-            action(); // Execute event action
-            System.out.println("✅ Event executed: " + this);
-    
-            // GUI Update
+            action();
+
+            // Notify the listener when the event is triggered
             if (eventListener != null) {
-                SwingUtilities.invokeLater(() -> {
-                    eventListener.onEventTriggered(getClass().getSimpleName() + " executed");
-                });
+                eventListener.onEventTriggered(getClass().getSimpleName());
             }
-    
+
         } catch (InterruptedException e) {
-            System.err.println("❌ Event interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
     }
 
-
     public abstract void action();
 
-    // Suspend thread
     public void suspend() {
-        running = false;
+        synchronized (lock) {
+            running = false;
+        }
     }
 
-    // Resume thread
     public void resume() {
         synchronized (lock) {
             running = true;
             lock.notify();
         }
     }
-
 }

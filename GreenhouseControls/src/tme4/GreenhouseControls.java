@@ -33,16 +33,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
 import java.util.Calendar;
 
 
-interface Fixable {
-    void fix();
-    void log();
-}
-
-public class GreenhouseControls extends Controller implements Serializable, Fixable{
+public class GreenhouseControls extends Controller implements Serializable{
     //To properly manage event execution, replace both eventMap and eventThreads with stateVariables, which is already declared
     // private final Map<Event, Integer> eventErrorCode = new HashMap<>();
     // private final Map<Event, String> eventNames = new HashMap<>();
@@ -51,7 +47,7 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
     // private final Map<Event, String> eventDescriptions = new HashMap<>();
     // private final Map<Event, Boolean> eventMalfunctionIsFixed = new HashMap<>();
     // private final Map<Event, Boolean> eventIsOn = new HashMap<>(); 
-
+    private final Map<Event, Thread> eventThreads = new ConcurrentHashMap<>();
     private static final Map<String, TwoTuple<String, Object>> stateVariables = Collections.synchronizedMap(new HashMap<>());
     private static final int MAX_WINDOWS = 5; // Limit of 5 windows
     private final boolean[] windowStates = new boolean[MAX_WINDOWS]; // Track window state
@@ -111,20 +107,7 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
         return (errorEntry != null && errorEntry.value instanceof Integer) ? (int) errorEntry.value : 0;
     }
 
-    /**
-     * @param errorcode
-     * @return Fixable object to fix the error
-     */
-    public Fixable getFixable(int errorcode){
-        switch (errorcode) {
-            case 1:
-            return new FixWindow();
-            case 2:
-            return new PowerOn();
-            default:
-            return null;
-        }
-    }
+
 
     /**
      * Sets error code for an event
@@ -152,9 +135,9 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
     /**
      * Sets malfunction status for an event
      */
-    public void setEventMalfunctionIsFixed(Event event, boolean isFixed) {
-        setVariable(event.getClass().getSimpleName() + "_isFixed", isFixed);
-    }
+    // public void setEventMalfunctionIsFixed(Event event, boolean isFixed) {
+    //     setVariable(event.getClass().getSimpleName() + "_isFixed", isFixed);
+    // }
 
     public void setEventIsOn(Event event, boolean isOn) {
         setVariable(event.getClass().getSimpleName() + "_isOn", isOn);
@@ -164,18 +147,11 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
         setVariable(event.getClass().getSimpleName() + "_thread", thread);
     }
 
+    
     /**
-     * Retrieves whether an event malfunction has been fixed
+     * Retrieves whether an event is on/off
      */
-    public boolean isEventFixed(Event event) {
-        TwoTuple<String, Object> fixedEntry = getVariable(event.getClass().getSimpleName() + "_isFixed");
-        return (fixedEntry != null && fixedEntry.value instanceof Boolean) ? (boolean) fixedEntry.value : true;
-    }
-
-    /**
-     * Retrieves whether an event is on
-     */
-    public boolean isEventOn(Event event) {
+    public boolean isEvent(Event event) {
         TwoTuple<String, Object> isOnEntry = getVariable(event.getClass().getSimpleName() + "_isOn");
         return (isOnEntry != null && isOnEntry.value instanceof Boolean) ? (boolean) isOnEntry.value : false;
     }
@@ -228,76 +204,7 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
         return true;
     }
 
-    // Fixable interface methods
-    @Override
-    public void fix() {
-        synchronized (stateVariables) {
-            // Fix all event malfunctions
-            stateVariables.forEach((key, value) -> {
-                if (key.endsWith("_isFixed")) {
-                    setVariable(key, true); // Mark all events as fixed
-                }
-            });
-    
-            // Reset error codes for all events
-            stateVariables.forEach((key, value) -> {
-                if (key.endsWith("_errorCode")) {
-                    setVariable(key, 0);
-                }
-            });
-    
-            System.out.println("All events fixed.");
-            log();
-        }
-    }
 
-    @Override
-    public void log() {
-        synchronized (stateVariables) {
-            try (PrintWriter writer = new PrintWriter(new FileWriter("fix.log", true))) {
-                String timestamp = Calendar.getInstance().getTime().toString();
-    
-                // Check if all windows are fixed and power is restored
-                boolean allWindowsFixed = stateVariables.entrySet().stream()
-                    .filter(e -> e.getKey().endsWith("_isFixed"))
-                    .allMatch(e -> (boolean) e.getValue().value);
-    
-                boolean allPowerOn = stateVariables.entrySet().stream()
-                    .filter(e -> e.getKey().endsWith("_isOn"))
-                    .allMatch(e -> (boolean) e.getValue().value);
-    
-                writer.println("All events fixed at " + timestamp);
-                writer.printf("%s | Fix applied. Window: %s, Power: %s, Error Code Reset.%n",
-                      timestamp, allWindowsFixed ? "OK" : "Malfunction", allPowerOn ? "On" : "Off");
-    
-            } catch (IOException e) {
-                System.err.println("Error writing to log file: " + e.getMessage());
-            }
-        }
-    }
-    
-    
-    /**
-     * Checks if all windows are fixed.
-     */
-    private boolean allWindowsFixed() {
-        synchronized (stateVariables) {
-            return stateVariables.entrySet().stream()
-                .filter(e -> e.getKey().endsWith("_isFixed"))
-                .allMatch(e -> (boolean) e.getValue().value);
-        }
-    }
-
-    /**
-     * Checks if all power is on.
-     */
-    private boolean allPowerOn() {
-        synchronized (stateVariables) {
-            return stateVariables.entrySet().stream()
-                .filter(e -> e.getKey().endsWith("_isOn"))
-                .allMatch(e -> (boolean) e.getValue().value);
-        }
-    }
 
     // Method to serialize the state of the system
     private void serializeState() {
@@ -325,123 +232,44 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
 
     // Event handling
     // Start event with delay and period, all events that have been created will be started.
-    public void startEvent(String eventName, long delayTime, long period) {
-        System.out.println("🟢 Attempting to start event: " + eventName);
-    
-        if (stateVariables.containsKey(eventName)) {
-            System.out.println("❌ Duplicate event ignored: " + eventName);
-            return;
-        }
-    
+    // The event will be started in a new thread. 
+    public void startEvent(String eventName, long delayTime, Object rings) {
         try {
             Class<?> clazz = Class.forName("tme4.events." + eventName);
-            Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
-            Event event = (Event) constructor.newInstance(this, delayTime);
+            if (eventName == "Bell") {
+                Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class, int.class);
+                Event event = (Event) constructor.newInstance(this, delayTime, rings);
+                setVariable(eventName + "_rings", rings);
+
+                Thread eventThread = new Thread(event);
+                eventThreads.put(event, eventThread);
+                eventThread.start();
+                } else {
+                Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
+                Event event = (Event) constructor.newInstance(this, delayTime);
+                
+                Thread eventThread = new Thread(event);
+                eventThreads.put(event, eventThread);
+                eventThread.start();
+                }
     
-            setVariable(eventName, event);
-            addEvent(event);  // ✅ Ensure event is added to Controller's event list
-            new Thread(event).start();
-            
-            System.out.println(eventName + " event started.");
+                setVariable(eventName, "Started");
+                System.out.println("Event started: " + eventName);
         } catch (Exception e) {
-            System.err.println("Failed to create event: " + e.getMessage());
+            System.err.println("Failed to start event: " + e.getMessage());
         }
-    }
-        
-    // Suspend all event threads
-    public void suspendEvents() {
-        synchronized (stateVariables) {
-            stateVariables.forEach((key, value) -> {
-                if (value.value instanceof Event) {
-                    ((Event) value.value).suspend();
-                }
-            });
-        }
-        System.out.println("All events suspended.");
-    }
-
-    // Resume all event threads
-    public void resumeEvents() {
-        synchronized (stateVariables) {
-            stateVariables.forEach((key, value) -> {
-                if (value.value instanceof Event) {
-                    ((Event) value.value).resume();
-                }
-            });
-        }
-        System.out.println("All events resumed.");
     }
     
-    // Inner classes for fixing errors
-    // Inner class to restore power
-    // Inner class to restore power
-    public class PowerOn implements Fixable {
-        @Override
-        public void fix() {
-            synchronized (stateVariables) {
-                stateVariables.forEach((key, value) -> {
-                    if (key.endsWith("_isOn")) {
-                        setVariable(key, true);
-                    }
-                });
-            }
-            System.out.println("Power restored.");
-            log();
-        }
-
-        @Override
-        public void log() {
-            synchronized (stateVariables) {
-                try (PrintWriter writer = new PrintWriter(new FileWriter("fix.log", true))) {
-                    String timestamp = Calendar.getInstance().getTime().toString();
-                    boolean windowok = allWindowsFixed();
-                    boolean poweron = allPowerOn();
-
-                    writer.println("Power restored at " + timestamp);
-                    writer.printf("%s | Fix applied. Window: %s, Power: %s, Error Code Reset.%n",
-                        timestamp, windowok ? "OK" : "Malfunction", poweron ? "On" : "Off");
-
-                } catch (IOException e) {
-                    System.err.println("Error writing to log file: " + e.getMessage());
-                }
-            }
-        }
+    public void suspendEvents() {
+        eventThreads.keySet().forEach(Event::suspend);
+        System.out.println("⏸️ All events suspended.");
     }
-
-    // Inner class to fix window
-    public class FixWindow implements Fixable {
-        @Override
-        public void fix() {
-            synchronized (stateVariables) {
-                stateVariables.forEach((key, value) -> {
-                    if (key.endsWith("_isFixed")) {
-                        setVariable(key, true);
-                    }
-                });
-            }
-            System.out.println("Window fixed.");
-            log();
-        }
-
-        @Override
-        public void log() {
-            synchronized (stateVariables) {
-                try (PrintWriter writer = new PrintWriter(new FileWriter("fix.log", true))) {
-                    String timestamp = Calendar.getInstance().getTime().toString();
-                    boolean windowok = allWindowsFixed();
-                    boolean poweron = allPowerOn();
-
-                    writer.println("Window fixed at " + timestamp);
-                    writer.printf("%s | Fix applied. Window: %s, Power: %s, Error Code Reset.%n",
-                        timestamp, windowok ? "OK" : "Malfunction", poweron ? "On" : "Off");
-
-                } catch (IOException e) {
-                    System.err.println("Error writing to log file: " + e.getMessage());
-                }
-            }
-        }
+    
+    public void resumeEvents() {
+        eventThreads.keySet().forEach(Event::resume);
+        System.out.println("▶️ All events resumed.");
     }
-
+    
     // Custom exception class for controller errors
     public class ControllerException extends RuntimeException {
         public ControllerException(String message) {
@@ -500,101 +328,87 @@ public class GreenhouseControls extends Controller implements Serializable, Fixa
         File file = new File(filePath);
 
         if (!file.exists() || !file.isFile()) {
-            System.err.println("❌ Error: File does not exist: " + filePath);
+            System.err.println(" Error: File does not exist: " + filePath);
             return;
         }
         try(Scanner scanner = new Scanner(new File(filePath))){
             while(scanner.hasNextLine()){
                 String line = scanner.nextLine().trim();
                 if (line.isEmpty()) continue; // Skip empty lines
-
+                System.out.println("Format of line being passed to processEventLine: " + line);
                 processEventLine(line);
             }
         } catch(IOException e){
-            System.err.println("❌ Error reading file: " + e.getMessage());
+            System.err.println(" Error reading file: " + e.getMessage());
         }
     }
 
-    // Process a single event line
+
+    // Process a single line from the event file
+    // use Map<String, TwoTuple<String, Object>> stateVariables to store the event information
     private void processEventLine(String line) {
-        try {
-            // Parse key-value pairs
-            // Local map to store key-value pairs
-            Map<String, String> eventMap = new HashMap<>();
-            for (String pair : line.split(",")) {
-                String[] keyValue = pair.split("=");
-                if (keyValue.length == 2) {
-                    eventMap.put(keyValue[0].trim(), keyValue[1].trim());
-                } else {
-                    System.err.println("Invalid key-value pair: " + pair);
-                }
-            }
+        // Example line:
+        // Event=ThermostatNight,time=0
+        // Event=Bell,time=2000,rings=2
+        String eventName = null;
+        long delayTime = 0;
+        int rings = 0;  // Default: No rings specified
 
-            // Extract event name
-            // String eventName = eventMap.get("Event");
-            String eventName = eventMap.get("Event").trim();
-            if (eventName.startsWith("Event=")) {
-                eventName = eventName.substring(6);
-            }
-
-            if (eventName == null) {
-                System.err.println("Missing 'Event' key in line: " + line);
-                return;
-            }
-
-
-            // Extract delay time
-            long time = Long.parseLong(eventMap.get("time"));
-
-            // Check if event already exists in eventThreads (to avoid duplicates)
-            if (stateVariables.containsKey(eventName)) {
-                System.out.println("❌ Duplicate event ignored: " + eventName);
-                return;
-            }
-
-            // Use Reflection to create the Event dynamically
-            Class<?> clazz = Class.forName("tme4.events." + eventName);
-
-            // System.out.println("Available constructors for " + clazz.getName() + ":");  // Debugging
-            for (Constructor<?> c : clazz.getConstructors()) {
-                System.out.println(c);
-            }
-
-            Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
-            Event event = (Event) constructor.newInstance(this, time);
-
-
-            // Special cases: Events with extra parameters
-            if (eventName.equals("Bell") && eventMap.containsKey("rings")) {
-                int rings = Integer.parseInt(eventMap.get("rings"));
-                constructor = clazz.getConstructor(GreenhouseControls.class, long.class, int.class);
-                event = (Event) constructor.newInstance(this, time, rings);
-            } else if ((eventName.equals("WindowOn") || eventName.equals("WindowOff")) && eventMap.containsKey("windowID")) {
-                int windowID = Integer.parseInt(eventMap.get("windowID"));
-                constructor = clazz.getConstructor(GreenhouseControls.class, long.class, int.class);
-                event = (Event) constructor.newInstance(this, time, windowID);
-            } else if (eventName.equals("Restart") && eventMap.containsKey("filename")) {
-                String filename = eventMap.get("filename");
-                constructor = clazz.getConstructor(GreenhouseControls.class, long.class, String.class);
-                event = (Event) constructor.newInstance(this, time, filename);
-            } else {
-                // Default constructor (assume standard (GreenhouseControls, long) constructor)
-                constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
-                event = (Event) constructor.newInstance(this, time);
-            }
-
-            // Store in stateVariables instead of separate maps
-            stateVariables.put(eventName, new TwoTuple<>("event", event));
-            setVariable(eventName, event);
-            // System.out.println("✅ Successfully created event: " + eventName);
-
-        } catch (ClassNotFoundException e) {
-            System.err.println("❌ Error: Unknown event type '" + line + "'");
-        } catch (NoSuchMethodException e) {
-            System.err.println("❌ Error: Constructor not found for event '" + line + "'");
-        } catch (Exception e) {
-            System.err.println("❌ Error processing event line '" + line + "': " + e.getMessage());
+        // Map to store event properties
+        // Example map:
+        // String: Event, Object: Bell
+        // String: time, Object: 2000
+        // String: rings, Object: 2
+        Map<String, Object> eventNameMap = new HashMap<>();
+    
+        String[] parts = line.split(",");
+        for (String part : parts){
+            //Example part
+            //[Event=Bell]
+            //[time=2000]
+            //[rings=2]
+            String[] keyAndValue = part.split("=");
+            eventNameMap.put(keyAndValue[0], keyAndValue[1]);
         }
+
+        // Extract Event name
+        if (eventNameMap.containsKey("Event")) {
+            eventName = (String) eventNameMap.get("Event");
+        } else {
+            System.err.println("Error: Event name not found in line: " + line);
+            return;
+        }
+
+        // Extract delay time
+        if (eventNameMap.containsKey("time")) {
+            delayTime = Long.parseLong((String) eventNameMap.get("time"));
+        } else {
+            System.err.println("Error: Delay time not found in line: " + line);
+            return;
+        }
+
+        // Extract rings for event with rings property
+        if (eventNameMap.containsKey("rings")) {
+            try {
+                rings = Integer.parseInt((String) eventNameMap.get("rings"));
+            } catch (NumberFormatException e) {
+                System.err.println("Error: Invalid rings value in line: " + line);
+                return;
+            }
+        }
+        
+
+        // Store event information in stateVariables
+        synchronized (stateVariables) {
+            stateVariables.put(eventName, new TwoTuple<>("delayTime", delayTime));
+
+            // If the event has rings, store it as well
+            if (rings != -1) {
+                stateVariables.put(eventName + "_rings", new TwoTuple<>("rings", rings));
+            }
+        }
+        // Start the event with the extracted properties
+        startEvent(eventName, delayTime, rings);
     }
 
 }

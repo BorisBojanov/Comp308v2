@@ -11,7 +11,7 @@ public class ThermostatDay extends Event {
 
     @Override
     public void action() {
-        setVariable("Thremostat", false);
+        GreenhouseControls.setVariable("Thremostat", false);
         System.out.println("Thermostat is now set to Day mode.");
     }
 

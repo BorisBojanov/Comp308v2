@@ -11,7 +11,7 @@ public class ThermostatNight extends Event {
 
     @Override
     public void action() {
-        setVariable("Thermostat", true);
+        GreenhouseControls.setVariable("Thermostat", true);
         System.out.println("Thermostat is now set to Night mode.");
     }
 

@@ -39,7 +39,7 @@ public class PopupMenu extends JPopupMenu {
         });
 
         restartItem.addActionListener(e -> {
-            if (gui.getFilePath().isEmpty()) {
+            if (gui.getFilePathText().isEmpty()) {
                 JOptionPane.showMessageDialog(gui, "No event file loaded.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -49,8 +49,8 @@ public class PopupMenu extends JPopupMenu {
                 return;
             }
 
-            greenhouse.loadEventsFromFile(gui.getFilePath());
-            System.out.println("🔄 Restarting event file: " + gui.getFilePath());
+            greenhouse.loadEventsFromFile(gui.getFilePathText());
+            System.out.println("🔄 Restarting event file: " + gui.getFilePathText());
 
             startItem.setEnabled(true); // Re-enable start button
         });
@@ -65,7 +65,7 @@ public class PopupMenu extends JPopupMenu {
 
             try {
                 long delay = Long.parseLong(delayStr);
-                greenhouse.startEvent("Terminate", delay, 0);
+                greenhouse.startEvent("Terminate", delay, 1);
                 System.out.println("⏳ Terminate event scheduled in " + delay + "ms.");
 
                 updateMenuState(false);

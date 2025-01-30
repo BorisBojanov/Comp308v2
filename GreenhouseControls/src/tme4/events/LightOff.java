@@ -10,7 +10,7 @@ public class LightOff extends Event {
 
     @Override
     public void action() {
-        setVariable("Light", false);
+        GreenhouseControls.setVariable("Light", false);
         System.out.println("Light is off.");
     }
 

@@ -12,7 +12,7 @@ public class FansOff extends Event {
 
     @Override
     public void action() {
-        setVariable("Fans", false);
+        GreenhouseControls.setVariable("Fans", false);
         System.out.println("Fans are now off.");
     }
 

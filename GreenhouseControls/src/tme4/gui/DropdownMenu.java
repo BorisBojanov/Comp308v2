@@ -16,32 +16,37 @@ public class DropdownMenu extends JMenuBar {
     private JMenuItem restore; // Declare restore as a class variable to enable/disable it
     private final JFrame parentFrame;
     private static int windowCount = 1; // Track number of windows open
+    JMenu menu;
+    JMenuItem newWindow;
+    JMenuItem closeWindow;
+    JMenuItem openEvents;
+    JMenuItem exit;
 
     public DropdownMenu(GreenhouseControls greenhouse, JFrame parentFrame) {
         this.greenhouse = greenhouse;
         this.parentFrame = parentFrame;
 
-        JMenu menu = new JMenu("Options");
+        menu = new JMenu("Options");
 
-        JMenuItem newWindow = new JMenuItem("New Window");
+        newWindow = new JMenuItem("New Window");
         newWindow.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, ActionEvent.CTRL_MASK));
         newWindow.addActionListener(e -> openNewWindow());
 
-        JMenuItem closeWindow = new JMenuItem("Close Window");
+        closeWindow = new JMenuItem("Close Window");
         closeWindow.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, ActionEvent.CTRL_MASK));
         closeWindow.addActionListener(e -> closeCurrentWindow());
 
-        JMenuItem openEvents = new JMenuItem("Open Events");
+        openEvents = new JMenuItem("Open Events");
         openEvents.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK));
         openEvents.addActionListener(e -> openEventsFile());
 
-        JMenuItem restore = new JMenuItem("Restore");
+        restore = new JMenuItem("Restore");
         restore.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, ActionEvent.CTRL_MASK));
         restore.addActionListener(e -> restoreState());
         // restore.setEnabled(!greenhouse.getEventThreads().isEmpty()); // Disable if events are running
         restore.setEnabled(greenhouse.getEventThreads().isEmpty()); // Only enable if no events are running
 
-        JMenuItem exit = new JMenuItem("Exit");
+        exit = new JMenuItem("Exit");
         exit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, ActionEvent.CTRL_MASK));
         exit.addActionListener(e -> exitApplication());
 
@@ -103,6 +108,7 @@ public class DropdownMenu extends JMenuBar {
         if (returnValue == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
             greenhouse.loadEventsFromFile(selectedFile.getAbsolutePath());
+            System.out.println("✅ Loaded events from file: " + selectedFile.getAbsolutePath());
         } else {
             JOptionPane.showMessageDialog(parentFrame, "No file selected", "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -159,12 +165,12 @@ public class DropdownMenu extends JMenuBar {
 
                     if (errorCode == 1) {
                         System.out.println("Fixing window malfunction...");
-                        GreenhouseControls.FixWindow fixWindow = restoredControls.new FixWindow();
-                        fixWindow.fix();
+                        // GreenhouseControls.FixWindow fixWindow = restoredControls.new FixWindow();
+                        // fixWindow.fix();
                     } else if (errorCode == 2) {
                         System.out.println("Restoring power...");
-                        GreenhouseControls.PowerOn powerOn = restoredControls.new PowerOn();
-                        powerOn.fix();
+                        // GreenhouseControls.PowerOn powerOn = restoredControls.new PowerOn();
+                        // powerOn.fix();
                     }
                 }
             }

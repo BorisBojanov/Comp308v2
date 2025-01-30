@@ -14,61 +14,54 @@ Ctrl + Q → Exit
 
 package tme4.gui;
 
+import tme4.EventListener;
 import tme4.GreenhouseControls;
 import tme4.Event;
 import javax.swing.*;
 import java.awt.*;
 
-public class GreenhouseGUI extends JFrame implements Event.EventListener {
-    private final GreenhouseControls greenhouse;
-    private final JTextArea eventLog;
-    private final JTextField filePathField;
-    private final DropdownMenu dropdownMenu;
+public class GreenhouseGUI extends JFrame implements EventListener {
+    private GreenhouseControls greenhouse;
+    private JTextArea eventLog;
+    private JTextField filePathField;
+    private DropdownMenu dropdownMenu;
+    // JTextArea eventLog;
+    JPanel filePanel;
+    JButton loadButton;
+    JPanel buttonPanel;
+    JButton startButton;
+    JButton suspendButton;
+    JButton resumeButton;
+    JButton terminateButton;
+    JButton restartButton;
+    PopupMenu popupMenu;
 
     public GreenhouseGUI() {
         greenhouse = new GreenhouseControls();
-        dropdownMenu = new DropdownMenu(greenhouse, this); // Pass JFrame reference
-        
-        Event.setEventListener(this);  // ✅ This must be set to receive events!
+        dropdownMenu = new DropdownMenu(greenhouse, this); // Pass JFrame reference to DropdownMenu
+        // Register this GUI as the event listener
+        Event.setEventListener(this); 
 
         // setupUI(); // Move all UI-related setup to a separate method for clarity.
-    
-        // Set up GUI properties
-        setTitle("Greenhouse Controls");
-        setSize(600, 400);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
-
-        // Add menu bar
-        setJMenuBar(dropdownMenu);
-
-        // File Input Section
-        JPanel filePanel = new JPanel();
-        filePanel.setLayout(new BorderLayout());
-
-        filePathField = new JTextField("Enter file path here...");
-        JButton loadButton = new JButton("Load Events");
-
-        filePanel.add(filePathField, BorderLayout.CENTER);
-        filePanel.add(loadButton, BorderLayout.EAST);
-        add(filePanel, BorderLayout.NORTH);
-
-
-        // Event Log Display
+        setupUI();
+        
+        // Event Log Display-------
         eventLog = new JTextArea();
         eventLog.setEditable(false);
+
         add(new JScrollPane(eventLog), BorderLayout.CENTER);
+        //-------------------------
 
 
-        // Control Buttons
-        JPanel buttonPanel = new JPanel();
+        // Control Buttons on bottom of window
+        buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(1, 3));
 
-        JButton startButton = new JButton("Start Events");
-        JButton suspendButton = new JButton("Suspend Events");
-        JButton resumeButton = new JButton("Resume Events");
-        JButton terminateButton = new JButton("Terminate Events");
-        JButton restartButton = new JButton("Restart Events");
+        startButton = new JButton("Start Events");
+        suspendButton = new JButton("Suspend Events");
+        resumeButton = new JButton("Resume Events");
+        terminateButton = new JButton("Terminate Events");
+        restartButton = new JButton("Restart Events");
 
         buttonPanel.add(startButton);
         buttonPanel.add(suspendButton);
@@ -78,7 +71,7 @@ public class GreenhouseGUI extends JFrame implements Event.EventListener {
         add(buttonPanel, BorderLayout.SOUTH);
 
         // Create Popup Menu
-        PopupMenu popupMenu = new PopupMenu(greenhouse, this);
+        popupMenu = new PopupMenu(greenhouse, this);
         PopupMenu.attachPopup(this, popupMenu);
 
         // Button Actions
@@ -93,7 +86,9 @@ public class GreenhouseGUI extends JFrame implements Event.EventListener {
             suspendButton.setEnabled(true);
             resumeButton.setEnabled(false);
         });
+
         loadButton.addActionListener(e -> greenhouse.loadEventsFromFile(filePathField.getText()));
+        
         restartButton.addActionListener(e -> {
             if (filePathField.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No event file loaded.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -106,11 +101,12 @@ public class GreenhouseGUI extends JFrame implements Event.EventListener {
             }
     
             greenhouse.loadEventsFromFile(filePathField.getText());
-            System.out.println("🔄 Restarting event file: " + filePathField.getText());
+            System.out.println(" Restarting event file: " + filePathField.getText());
     
             startButton.setEnabled(true);
             popupMenu.updateMenuState(false);
         });
+        
         terminateButton.addActionListener(e -> {
             if (greenhouse.getEventThreads().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No events are running.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -134,31 +130,67 @@ public class GreenhouseGUI extends JFrame implements Event.EventListener {
             }
         });
 
-        // Register GUI as event listener
-        Event.setEventListener(this);
-        
-    }
+    } // End of Constructor
 
     @Override
     public void onEventTriggered(String eventDescription) {
-        System.out.println("🔔 Event received in GUI: " + eventDescription);  // ✅ Debugging statement
+        System.out.println(" Event received in GUI: " + eventDescription);  // ✅ Debugging statement
         SwingUtilities.invokeLater(() -> {
             eventLog.append("Event Triggered: " + eventDescription + "\n");
-            System.out.println("✅ Appended to JTextArea: " + eventDescription); // ✅ Debugging statement
+            System.out.println(" Appended to JTextArea: " + eventDescription); // ✅ Debugging statement
         });
     }
 
+    public String getFilePathText() {
+        String filePath = filePathField.getText();
+        return filePath;
+    }
     
-    
+    private void setupUI() {
+        // Set up GUI properties
+        this.setTitle("Greenhouse Controls");
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        // Add menu bar
+        setJMenuBar(dropdownMenu);
+
+        // File Input Section
+        filePanel = new JPanel();
+        filePanel.setLayout(new BorderLayout());
+
+        
+        filePathField = new JTextField("Enter file path here...");
+        loadButton = new JButton("Load Events");
+
+        filePanel.add(filePathField, BorderLayout.CENTER);
+        filePanel.add(loadButton, BorderLayout.EAST);
+        add(filePanel, BorderLayout.NORTH);
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             GreenhouseGUI gui = new GreenhouseGUI();
             gui.setVisible(true);
+
+            // GreenhouseControls greenhouse = new GreenhouseControls();
+            // // Start different events dynamically
+            // greenhouse.startEvent("LightOn",2000,0);
+            // greenhouse.startEvent("LightOff",4000,0);
+            // greenhouse.startEvent("FixWindow",6000,0);
+    
+            // // Suspend and resume events after some time
+            // try {
+            //     Thread.sleep(5000);
+            //     greenhouse.suspendEvents();
+            //     Thread.sleep(2000);
+            //     greenhouse.resumeEvents();
+            // } catch (InterruptedException e) {
+            //     e.printStackTrace();
+            // }
+
         });
     }
 
-    public String getFilePath() {
-        String filePath = filePathField.getText();
-        return filePath;
-    }
 }
