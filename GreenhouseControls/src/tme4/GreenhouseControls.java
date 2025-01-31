@@ -343,6 +343,21 @@ public class GreenhouseControls extends Controller implements Serializable{
         }
     }
 
+    public static Object convertStringToObject(String value, Class<?> type) {
+        if (type == Integer.class) {
+            return Integer.parseInt(value);
+        } else if (type == Long.class) {
+            return Long.parseLong(value);
+        } else if (type == Double.class) {
+            return Double.parseDouble(value);
+        } else if (type == Boolean.class) {
+            return Boolean.parseBoolean(value);
+        } else if (type == String.class) {
+            return value; // No conversion needed
+        } else {
+            throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
+        }
+    }
 
     // Process a single line from the event file
     // use Map<String, TwoTuple<String, Object>> stateVariables to store the event information
@@ -351,19 +366,15 @@ public class GreenhouseControls extends Controller implements Serializable{
         // Event=ThermostatNight,time=0
         // Event=Bell,time=2000,rings=2
 
+        String key = null;
+        Object value = null;
         String eventName = null;
-        long delayTime = 0;
-        int rings = 0;  // Default: No rings specified
-
-        String key;
-        Object value;
 
         // Map to store event properties
         // Example map:
         // String: Event, Object: Bell
         // String: time, Object: 2000
         // String: rings, Object: 2
-        Map<String, Object> eventNameMap= new TwoTuple<String,Object>(key, value);
     
         String[] parts = line.split(",");
         
@@ -376,40 +387,36 @@ public class GreenhouseControls extends Controller implements Serializable{
                     //[rings=2]
                     String[] keyAndValue = part.split("=");
                     
+                    key = keyAndValue[0];
+                    value = keyAndValue[1];
+                    System.out.println("Key and Value: " + key + " " + value);
+                    Object convertedValue = convertStringToObject((String) value, String.class);
         
                 // Extract Event name
                 if (part.contains("Event")) {
-                    eventName = (String) eventNameMap.get("Event");
-
-                    stateVariables.put(eventName ,eventNameMap.put(keyAndValue[0], keyAndValue[1]));
+                    eventName = (String) convertedValue;
+                    stateVariables.put(key , new TwoTuple<>("Event", convertedValue));
                 } else {
                     System.err.println("Error: Event name not found in line: " + line);
                     return;
                 }
 
                 // Extract delay time
-                if (eventNameMap.containsKey("time")) {
-                    delayTime = Long.parseLong((String) eventNameMap.get("time"));
+                if (part.contains("time")) {
+                    stateVariables.put(eventName, new TwoTuple<>("time", convertedValue));
                 } else {
                     System.err.println("Error: Delay time not found in line: " + line);
                     return;
                 }
 
                 // Extract rings for event with rings property
-                if (eventNameMap.containsKey("rings")) {
+                if (part.contains("rings")) {
                     try {
-                        rings = Integer.parseInt((String) eventNameMap.get("rings"));
+                        stateVariables.put(eventName, new TwoTuple<>("rings", convertedValue));
                     } catch (NumberFormatException e) {
                         System.err.println("Error: Invalid rings value in line: " + line);
                         return;
                     }
-                }
-
-                stateVariables.put(eventName, new TwoTuple<>("delayTime", delayTime));
-
-                // If the event has rings, store it as well
-                if (rings != -1) {
-                    stateVariables.put(eventName, new TwoTuple<>("rings", rings));
                 }
             }
         }
