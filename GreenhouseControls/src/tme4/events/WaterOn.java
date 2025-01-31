@@ -10,8 +10,9 @@ public class WaterOn extends Event {
 
     @Override
     public void action() {
-        GreenhouseControls.setVariable("Water", true);
-        System.out.println("Water is on.");
+        // Use correct setVariable() method with event name and property key
+        GreenhouseControls.setVariable("WaterOn", "status", true);
+        GreenhouseControls.setVariable("WaterOn", "message", "Water is on.");
     }
 
     @Override

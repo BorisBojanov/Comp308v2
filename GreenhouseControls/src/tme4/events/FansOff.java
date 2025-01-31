@@ -12,8 +12,9 @@ public class FansOff extends Event {
 
     @Override
     public void action() {
-        GreenhouseControls.setVariable("Fans", false);
-        System.out.println("Fans are now off.");
+        // Use correct setVariable() method with event name and property key
+        GreenhouseControls.setVariable("FansOff", "status", false);
+        GreenhouseControls.setVariable("FansOff", "message", "Fans are off.");
     }
 
     @Override

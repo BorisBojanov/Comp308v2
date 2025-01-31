@@ -85,8 +85,8 @@ public class GreenhouseGUI extends JFrame implements EventListener {
             resumeButton.setEnabled(false);
         });
 
-        startButton.addActionListener(e -> greenhouse.loadEventsFromFile(getFilePathText()));
-        
+        startButton.addActionListener(e -> greenhouse.executeLoadedEvents());
+                
         restartButton.addActionListener(e -> {
             if (filePath.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No event file loaded.", "Error", JOptionPane.ERROR_MESSAGE);

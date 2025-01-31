@@ -22,20 +22,18 @@ import tme4.events.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
-import java.util.Calendar;
 
 
 public class GreenhouseControls extends Controller implements Serializable{
@@ -48,25 +46,32 @@ public class GreenhouseControls extends Controller implements Serializable{
     // private final Map<Event, Boolean> eventMalfunctionIsFixed = new HashMap<>();
     // private final Map<Event, Boolean> eventIsOn = new HashMap<>(); 
     private final Map<Event, Thread> eventThreads = new ConcurrentHashMap<>();
-    private static final Map<String, TwoTuple<String, Object>> stateVariables = Collections.synchronizedMap(new HashMap<>());
-    private static final int MAX_WINDOWS = 5; // Limit of 5 windows
+    private static final Map<String, List<TwoTuple<String, Object>>> stateVariables = Collections.synchronizedMap(new HashMap<>()); private static final int MAX_WINDOWS = 5; // Limit of 5 windows
     private final boolean[] windowStates = new boolean[MAX_WINDOWS]; // Track window state
-
+    
 
     // Getters for stateVariables 
     public Map<Event, Thread> getEventThreads() {
         Map<Event, Thread> eventThreadMap = new HashMap<>();
     
         synchronized (stateVariables) {
-            stateVariables.forEach((key, value) -> {
-                if (value.value instanceof Event) {
-                    String eventName = key;
-                    Event event = (Event) value.value;
+            stateVariables.forEach((eventName, propertiesList) -> {
+                if (propertiesList != null) {
+                    Event event = null;
+                    Thread thread = null;
     
-                    // Check for the associated thread
-                    TwoTuple<String, Object> threadTuple = stateVariables.get(eventName + "_thread");
-                    if (threadTuple != null && threadTuple.value instanceof Thread) {
-                        Thread thread = (Thread) threadTuple.value;
+                    // Iterate through the list of TwoTuple objects
+                    for (TwoTuple<String, Object> property : propertiesList) {
+                        if (property.value instanceof Event) {
+                            event = (Event) property.value;
+                        }
+                        if (property.value instanceof Thread) {
+                            thread = (Thread) property.value;
+                        }
+                    }
+    
+                    // If both an event and thread exist, store them in the map
+                    if (event != null && thread != null) {
                         eventThreadMap.put(event, thread);
                     }
                 }
@@ -75,15 +80,15 @@ public class GreenhouseControls extends Controller implements Serializable{
     
         return eventThreadMap;
     }
-
-
+    
     public void printStateVariables() {
         synchronized (stateVariables) {
             System.out.println("📋 Current State Variables:");
-            for (Map.Entry<String, TwoTuple<String, Object>> entry : stateVariables.entrySet()) {
-                System.out.println(" Event Name: " + entry.getKey());
-                System.out.println("     Key: " + entry.getValue().key);
-                System.out.println("     Value: " + entry.getValue().value);
+            for (Map.Entry<String, List<TwoTuple<String, Object>>> entry : stateVariables.entrySet()) {
+                System.out.println("🔹 Event Name: " + entry.getKey());
+                for (TwoTuple<String, Object> tuple : entry.getValue()) {
+                    System.out.println("    🔸 " + tuple.key + " = " + tuple.value);
+                }
             }
         }
     }
@@ -92,44 +97,58 @@ public class GreenhouseControls extends Controller implements Serializable{
      * Gets all the events and their assigned Variables
      * @return Map<String, TwoTuple<String, Object>>
     */ 
-    public static Map<String, TwoTuple<String, Object>> getStateVariables() {
-        return stateVariables;
+    public static synchronized void setVariable(String key, String propertyKey, Object value) {
+        synchronized (stateVariables) {
+            stateVariables.computeIfAbsent(key, k -> new ArrayList<>()).add(new TwoTuple<>(propertyKey, value));
+        }
     }
-
-
+    
     /**
      * Gets the Value Pair based on Event
      * @param eventName
      * @return TwoTuple<String, Object>
     */
-    public static synchronized TwoTuple<String, Object> getEventVariable(String eventName) {
-          
-        return stateVariables.get(eventName);
+    public static synchronized Object getEventVariable(String eventName, String propertyKey) {
+        synchronized (stateVariables) {
+            List<TwoTuple<String, Object>> properties = stateVariables.get(eventName);
+            if (properties != null) {
+                for (TwoTuple<String, Object> tuple : properties) {
+                    if (tuple.key.equals(propertyKey)) {
+                        return tuple.value;
+                    }
+                }
+            }
+        }
+        return null; // Return null if property not found
     }
     
-    
+
+    public synchronized Map<String, List<TwoTuple<String, Object>>> getStateVariables() {
+        return stateVariables;
+    }
+
      /**
      * Retrieves error code for an event
      * @param event
      * @return int errorcode
      */
-    public int getEventErrorCode(Event event) {
-        TwoTuple<String, Object> errorEntry = getEventVariable(event.getClass().getSimpleName() + "_errorCode");
-        return (errorEntry != null && errorEntry.value instanceof Integer) ? (int) errorEntry.value : 0;
-    }
+    // public int getEventErrorCode(Event event) {
+    //     TwoTuple<String, Object> errorEntry = getEventVariable(event.getClass().getSimpleName() + "_errorCode");
+    //     return (errorEntry != null && errorEntry.value instanceof Integer) ? (int) errorEntry.value : 0;
+    // }
 
     /**
      * Retrieves the error code for a specific event from stateVariables.
      * @param event The event for which the error code is requested.
      * @return The error code as an integer. Returns 0 if the event has no error.
      */
-    public int getError(Event event) {
-        String key = event.getClass().getSimpleName() + "_errorCode";
-        TwoTuple<String, Object> errorEntry = getEventVariable(key);
+    // public int getError(Event event) {
+    //     String key = event.getClass().getSimpleName() + "_errorCode";
+    //     TwoTuple<String, Object> errorEntry = getEventVariable(key);
 
-        // Check if the retrieved value exists and is an Integer
-        return (errorEntry != null && errorEntry.value instanceof Integer) ? (int) errorEntry.value : 0;
-    }
+    //     // Check if the retrieved value exists and is an Integer
+    //     return (errorEntry != null && errorEntry.value instanceof Integer) ? (int) errorEntry.value : 0;
+    // }
 
 
 
@@ -137,28 +156,24 @@ public class GreenhouseControls extends Controller implements Serializable{
      * Setters
      */
 
-    // Set a variable in the system state
-    public static synchronized void setVariable(String key, Object value) {     
-        stateVariables.put(key, new TwoTuple<>(key, value));
-        // System.out.println("Updated variable: " + key + " = " + value); // Debugging
-    }
-
-    public void setEventErrorCode(Event event, int errorCode) {
-        setVariable(event.getClass().getSimpleName() + "_errorCode", errorCode);
-    }
 
 
-    public void setEventThreads(Event event, Thread thread) {
-        setVariable(event.getClass().getSimpleName() + "_thread", thread);
-    }
+    // public void setEventErrorCode(Event event, int errorCode) {
+    //     setVariable(event.getClass().getSimpleName() + "_errorCode", errorCode);
+    // }
+
+
+    // public void setEventThreads(Event event, Thread thread) {
+    //     setVariable(event.getClass().getSimpleName() + "_thread", thread);
+    // }
 
     /**
      * Retrieves whether an event is on/off
      */
-    public boolean getIsEvent(Event event) {
-        TwoTuple<String, Object> isOnEntry = getEventVariable(event.getClass().getSimpleName() + "_isOn");
-        return (isOnEntry != null && isOnEntry.value instanceof Boolean) ? (boolean) isOnEntry.value : false;
-    }
+    // public boolean getIsEvent(Event event) {
+    //     TwoTuple<String, Object> isOnEntry = getEventVariable(event.getClass().getSimpleName() + "_isOn");
+    //     return (isOnEntry != null && isOnEntry.value instanceof Boolean) ? (boolean) isOnEntry.value : false;
+    // }
     
  
     
@@ -230,35 +245,100 @@ public class GreenhouseControls extends Controller implements Serializable{
         }
     }
 
+    /**
+    Iterate through stateVariables to find all loaded events.
+    Check if each event has enough information to call startEvent().
+    Call startEvent() with two or three parameters, depending on whether the event has a "rings" value.
+
+    Iterates over stateVariables (which contains all stored events).
+    Extracts "time" and, if available, "rings" from the TwoTuple list.
+    If "time" is missing, it skips the event.
+    Calls startEvent(eventName, delayTime, rings) if "rings" is available.
+    Otherwise, calls startEvent(eventName, delayTime).
+    */
+    public void executeLoadedEvents() {
+        synchronized (stateVariables) {
+            System.out.println("▶️ Executing all loaded events...");
+    
+            for (Map.Entry<String, List<TwoTuple<String, Object>>> entry : stateVariables.entrySet()) {
+                String eventName = entry.getKey();
+                List<TwoTuple<String, Object>> properties = entry.getValue();
+    
+                Long delayTime = null;
+                Integer rings = null;
+    
+                // Extract parameters from the properties list
+                for (TwoTuple<String, Object> tuple : properties) {
+                    if (tuple.key.equals("time") && tuple.value instanceof Long) {
+                        delayTime = (Long) tuple.value;
+                    } else if (tuple.key.equals("rings") && tuple.value instanceof Integer) {
+                        rings = (Integer) tuple.value;
+                    }
+                }
+    
+                // Ensure that the event has a delay time
+                if (delayTime == null) {
+                    System.err.println("⚠️ Skipping event '" + eventName + "': Missing 'time' parameter.");
+                    continue;
+                }
+    
+                // Call the correct `startEvent()` method based on the presence of `rings`
+                if (rings != null) {
+                    startEvent(eventName, delayTime, rings);
+                } else {
+                    startEvent(eventName, delayTime);
+                }
+            }
+        }
+    }
+
     // Event handling
     // Start event with delay and period, all events that have been created will be started.
     // The event will be started in a new thread. 
-    public void startEvent(String eventName, long delayTime, Object rings) {
+    public void startEvent(String eventName, long delayTime) {
         try {
             Class<?> clazz = Class.forName("tme4.events." + eventName);
-            if (eventName == "Bell") {
-                Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class, int.class);
-                Event event = (Event) constructor.newInstance(this, delayTime, rings);
-                setVariable(eventName + "_rings", rings);
-
-                Thread eventThread = new Thread(event);
-                eventThreads.put(event, eventThread);
-                eventThread.start();
-                } else {
-                Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
-                Event event = (Event) constructor.newInstance(this, delayTime);
-                
-                Thread eventThread = new Thread(event);
-                eventThreads.put(event, eventThread);
-                eventThread.start();
-                }
+            Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class);
+            Event event = (Event) constructor.newInstance(this, delayTime);
     
-                setVariable(eventName, "Started");
-                System.out.println("Event started: " + eventName);
+            Thread eventThread = new Thread(event);
+            eventThreads.put(event, eventThread);
+            eventThread.start();
+    
+            // Store event properties correctly
+            setVariable(eventName, "status", "Started");
+            setVariable(eventName, "time", delayTime);
+            setVariable(eventName, "thread", eventThread); // Store thread reference
+    
+            System.out.println("✅ Event started: " + eventName);
         } catch (Exception e) {
-            System.err.println("Failed to start event: " + e.getMessage());
+            System.err.println("❌ Failed to start event: " + e.getMessage());
         }
     }
+    
+    
+    public void startEvent(String eventName, long delayTime, int rings) {
+        try {
+            Class<?> clazz = Class.forName("tme4.events." + eventName);
+            Constructor<?> constructor = clazz.getConstructor(GreenhouseControls.class, long.class, int.class);
+            Event event = (Event) constructor.newInstance(this, delayTime, rings);
+    
+            Thread eventThread = new Thread(event);
+            eventThreads.put(event, eventThread);
+            eventThread.start();
+    
+            // Store event properties correctly
+            setVariable(eventName, "status", "Started");
+            setVariable(eventName, "time", delayTime);
+            setVariable(eventName, "rings", rings);
+            setVariable(eventName, "thread", eventThread); // Store thread reference
+    
+            System.out.println("✅ Event started with rings: " + eventName);
+        } catch (Exception e) {
+            System.err.println("❌ Failed to start event: " + e.getMessage());
+        }
+    }
+    
     
     public void suspendEvents() {
         eventThreads.keySet().forEach(Event::suspend);
@@ -277,50 +357,32 @@ public class GreenhouseControls extends Controller implements Serializable{
         }
       }
     
-    @Override
-    public void run() {
-        while (eventList.size() > 0) {
-            for (Event e : new ArrayList<>(eventList)) {
-                if (e.ready()) {
-                    try {
-                        System.out.println(e);
-                        e.action(); // Execute event action
-                        eventList.remove(e); // Remove event after execution
-                    } catch (ControllerException ex) {
-                        logError(ex.getMessage());
-                        serializeState();
-                        System.exit(1); // Exit after handling the error
-                    }
-                }
-            }
-        }
-    }
-
+ 
     /**
      * Logs errors to a file with a timestamp and event error code.
      * @param message
      */
-    private void logError(String message) {
-        synchronized (stateVariables) {
-            try (PrintWriter writer = new PrintWriter(new FileWriter("error.log", true))) {
-                String timestamp = Calendar.getInstance().getTime().toString();
+    // private void logError(String message) {
+    //     synchronized (stateVariables) {
+    //         try (PrintWriter writer = new PrintWriter(new FileWriter("error.log", true))) {
+    //             String timestamp = Calendar.getInstance().getTime().toString();
 
-                // Collect all error codes dynamically
-                StringBuilder errorCodes = new StringBuilder();
-                stateVariables.forEach((key, value) -> {
-                    if (key.endsWith("_errorCode")) {
-                        errorCodes.append(key.replace("_errorCode", "")).append(": ")
-                            .append(value.value).append(", ");
-                    }
-                });
+    //             // Collect all error codes dynamically
+    //             StringBuilder errorCodes = new StringBuilder();
+    //             stateVariables.forEach((key, value) -> {
+    //                 if (key.endsWith("_errorCode")) {
+    //                     errorCodes.append(key.replace("_errorCode", "")).append(": ")
+    //                         .append(value.value).append(", ");
+    //                 }
+    //             });
 
-                writer.println(timestamp + " | Errors Code: " + message + " | " + errorCodes.toString());
+    //             writer.println(timestamp + " | Errors Code: " + message + " | " + errorCodes.toString());
 
-            } catch (IOException e) {
-                System.err.println("Error writing to log file: " + e.getMessage());
-            }
-        }
-    }
+    //         } catch (IOException e) {
+    //             System.err.println("Error writing to log file: " + e.getMessage());
+    //         }
+    //     }
+    // }
 
     // Load events from a file
     // Choosing not to convert to absolute path, as it is hard.
@@ -343,92 +405,62 @@ public class GreenhouseControls extends Controller implements Serializable{
         }
     }
 
-    public static Object convertStringToObject(String value, Class<?> type) {
-        if (type == Integer.class) {
-            return Integer.parseInt(value);
-        } else if (type == Long.class) {
-            return Long.parseLong(value);
-        } else if (type == Double.class) {
-            return Double.parseDouble(value);
-        } else if (type == Boolean.class) {
-            return Boolean.parseBoolean(value);
-        } else if (type == String.class) {
-            return value; // No conversion needed
+    private static Object parseValue(String value) {
+        if (value.matches("-?\\d+")) {
+            return Integer.parseInt(value);  // Integer
+        } else if (value.matches("-?\\d+\\.\\d+")) {
+            return Double.parseDouble(value); // Double
+        } else if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return Boolean.parseBoolean(value); // Boolean
         } else {
-            throw new IllegalArgumentException("Unsupported type: " + type.getSimpleName());
+            return value; // Assume String
         }
     }
-
+    
     // Process a single line from the event file
     // use Map<String, TwoTuple<String, Object>> stateVariables to store the event information
     private void processEventLine(String line) {
-        // Example line:
-        // Event=ThermostatNight,time=0
+        // Example lines:
         // Event=Bell,time=2000,rings=2
+        // Event=ThermostatNight,time=0
 
-        String key = null;
-        Object value = null;
-        String eventName = null;
-
-        // Map to store event properties
-        // Example map:
-        // String: Event, Object: Bell
-        // String: time, Object: 2000
-        // String: rings, Object: 2
-    
+        Map<String, String> eventMap = new HashMap<>();
         String[] parts = line.split(",");
-        
-        // Store event information in stateVariables
-        synchronized (stateVariables) {
-                for (String part : parts){
-                    //Example part
-                    //[Event=Bell]
-                    //[time=2000]
-                    //[rings=2]
-                    String[] keyAndValue = part.split("=");
-                    
-                    key = keyAndValue[0];
-                    value = keyAndValue[1];
-                    System.out.println("Key and Value: " + key + " " + value);
-                    Object convertedValue = convertStringToObject((String) value, String.class);
-        
-                // Extract Event name
-                if (part.contains("Event")) {
-                    eventName = (String) convertedValue;
-                    stateVariables.put(key , new TwoTuple<>("Event", convertedValue));
-                } else {
-                    System.err.println("Error: Event name not found in line: " + line);
-                    return;
-                }
 
-                // Extract delay time
-                if (part.contains("time")) {
-                    stateVariables.put(eventName, new TwoTuple<>("time", convertedValue));
-                } else {
-                    System.err.println("Error: Delay time not found in line: " + line);
-                    return;
-                }
+        for (String part : parts) {
+            String[] keyValue = part.split("=");
 
-                // Extract rings for event with rings property
-                if (part.contains("rings")) {
-                    try {
-                        stateVariables.put(eventName, new TwoTuple<>("rings", convertedValue));
-                    } catch (NumberFormatException e) {
-                        System.err.println("Error: Invalid rings value in line: " + line);
-                        return;
-                    }
-                }
+            if (keyValue.length == 2) {
+                eventMap.put(keyValue[0].trim(), keyValue[1].trim());
+            } else {
+                System.err.println("❌ Invalid key-value pair: " + part);
             }
         }
 
+        // Extract event name
+        if (!eventMap.containsKey("Event")) {
+            System.err.println("❌ Missing 'Event' key in line: " + line);
+            return;
+        }
 
-       
-        
+        String eventName = eventMap.get("Event");
 
- 
-        // Start the event with the extracted properties
+        // Create a list to store event properties
+        List<TwoTuple<String, Object>> eventProperties = new ArrayList<>();
 
-        // startEvent(eventName, delayTime, rings);
+        // Store all key-value pairs except "Event"
+        for (Map.Entry<String, String> entry : eventMap.entrySet()) {
+            if (!entry.getKey().equals("Event")) {
+                eventProperties.add(new TwoTuple<>(entry.getKey(), parseValue(entry.getValue())));
+            }
+        }
+
+        // Store event properties in stateVariables
+        synchronized (stateVariables) {
+            stateVariables.put(eventName, eventProperties);
+        }
+        // Print stateVariables to confirm storage
+        printStateVariables();
     }
 
 }

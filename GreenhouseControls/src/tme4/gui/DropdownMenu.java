@@ -3,6 +3,7 @@ package tme4.gui;
 import javax.swing.*;
 import java.awt.event.*;
 import java.io.File;
+import java.util.List;
 import java.util.Map;
 
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -156,29 +157,29 @@ public class DropdownMenu extends JMenuBar {
     /**
      * Fixes system state after restoration.
      */
-    private void fixRestoredSystem(GreenhouseControls restoredControls) {
-        // Iterate through all state variables to find error codes
-        synchronized (GreenhouseControls.getStateVariables()) {
-            for (Map.Entry<String, TwoTuple<String, Object>> entry : GreenhouseControls.getStateVariables().entrySet()) {
-                String key = entry.getKey();
-                
-                if (key.endsWith("_errorCode") && entry.getValue().value instanceof Integer) {
-                    int errorCode = (int) entry.getValue().value;
+private void fixRestoredSystem(GreenhouseControls restoredControls) {
+    // Iterate through all state variables to find error codes
+    synchronized (restoredControls.getStateVariables()) {
+        for (Map.Entry<String, List<TwoTuple<String, Object>>> entry : restoredControls.getStateVariables().entrySet()) {
+            String key = entry.getKey();
+
+            for (TwoTuple<String, Object> tuple : entry.getValue()) {
+                if (key.endsWith("_errorCode") && tuple.value instanceof Integer) {
+                    int errorCode = (int) tuple.value;
 
                     if (errorCode == 1) {
                         System.out.println("Fixing window malfunction...");
-                        // GreenhouseControls.FixWindow fixWindow = restoredControls.new FixWindow();
-                        // fixWindow.fix();
+                        // restoredControls.fixWindow(); // Uncomment if FixWindow method exists
                     } else if (errorCode == 2) {
                         System.out.println("Restoring power...");
-                        // GreenhouseControls.PowerOn powerOn = restoredControls.new PowerOn();
-                        // powerOn.fix();
+                        // restoredControls.powerOn(); // Uncomment if PowerOn method exists
                     }
                 }
             }
         }
-        System.out.println("✅ System restoration fixes applied.");
     }
+    System.out.println("✅ System restoration fixes applied.");
+}
     
     /**
      * Updates the restore button based on the state of the system.

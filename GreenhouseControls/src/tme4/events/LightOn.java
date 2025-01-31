@@ -10,8 +10,8 @@ public class LightOn extends Event{
 
     @Override
     public void action() {
-        GreenhouseControls.setVariable("Light", true);
-        System.out.println("Light is on.");
+        GreenhouseControls.setVariable("LightOn", "status", true);
+        GreenhouseControls.setVariable("LightOn", "message", "Light is on.");
     }
     
     @Override
